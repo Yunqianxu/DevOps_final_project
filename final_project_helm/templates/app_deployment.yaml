@@ -1,0 +1,52 @@
+# Service: This manifest exposes the Django application to the internet or within the cluster.
+# A LoadBalancer service type makes it accessible over the internet when running on supported cloud providers.
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-app
+spec:
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000 #port to the django-app image
+  selector:
+    app: django-app
+    tier: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-app-deployment
+  labels:
+    app: django-app-deployment
+spec:
+  selector:
+    matchLabels:
+      app: django-app
+      tier: frontend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: django-app
+        tier: frontend
+    spec:
+      containers:
+        - name: django-app
+          image: alexun/django-app:latest #~~~
+          ports:
+            - containerPort: 8000
+      command:
+        - "sh"
+        - "-c"
+        - |
+          python manage.py migrate
+          cat <<EOF | python manage.py shell
+          from django.contrib.auth import get_user_model
+          User = get_user_model()  # get the currently active user model,
+          User.objects.filter(username='admin').exists() or \
+            User.objects.create_superuser('adminuser', 'yunqianxu0331@gmail.com', 'M7sTSEc3!')
+          EOF
+          python manage.py runserver 0.0.0.0:8000
