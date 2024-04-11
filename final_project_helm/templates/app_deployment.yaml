@@ -10,6 +10,7 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 8000 #port to the django-app image
+      nodePort: 30000
   selector:
     app: django-app
     tier: frontend
@@ -18,9 +19,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: django-app-deployment
-  labels:
-    app: django-app-deployment
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: django-app
@@ -33,20 +33,16 @@ spec:
         app: django-app
         tier: frontend
     spec:
+      initContainers:
+        - name: init-django
+          image: alexun/django-app:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              python manage.py migrate
+              python manage.py shell -c "from django.contrib.auth.models import User; User.objects.filter(username='adminuser').exists() or User.objects.create_superuser('adminuser', 'yunqianxu0331@gmail.com', 'M7sTSEc3!')"
       containers:
         - name: django-app
-          image: alexun/django-app:latest #~~~
+          image: alexun/django-app:latest
           ports:
             - containerPort: 8000
-      command:
-        - "sh"
-        - "-c"
-        - |
-          python manage.py migrate
-          cat <<EOF | python manage.py shell
-          from django.contrib.auth import get_user_model
-          User = get_user_model()  # get the currently active user model,
-          User.objects.filter(username='admin').exists() or \
-            User.objects.create_superuser('adminuser', 'yunqianxu0331@gmail.com', 'M7sTSEc3!')
-          EOF
-          python manage.py runserver 0.0.0.0:8000
